@@ -12,11 +12,14 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     
+    <!-- Load PropTypes (Bắt buộc cho Recharts trong môi trường standalone) -->
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    
     <!-- Load Babel for JSX compiling -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- Load Recharts -->
-    <script src="https://unpkg.com/recharts/umd/Recharts.js" crossorigin></script>
+    <!-- Load Recharts (Sử dụng phiên bản 2.1.12 ổn định cho trình duyệt) -->
+    <script src="https://unpkg.com/recharts@2.1.12/umd/Recharts.js" crossorigin></script>
     
     <!-- Load Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -417,4 +420,92 @@
                     <table className="w-full text-left text-sm text-slate-600 whitespace-nowrap">
                       <thead className="bg-white text-slate-500 font-semibold text-xs uppercase tracking-wider border-b border-slate-200">
                         <tr>
-                          <th className="px-6 py-4 w-[45%]">Tên Đầu Mục
+                          <th className="px-6 py-4 w-[45%]">Tên Đầu Mục / Hoạt Động / Sản phẩm</th>
+                          <th className="px-6 py-4 text-right">Chỉ tiêu</th>
+                          <th className="px-6 py-4 text-right">Thực tế</th>
+                          <th className="px-6 py-4 min-w-[150px]">Tiến độ (%)</th>
+                          <th className="px-6 py-4">Trạng thái</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        
+                        {Object.entries(groupedTree).map(([groupName, activities], groupIdx) => (
+                          <Fragment key={`group-${groupIdx}`}>
+                            
+                            {/* Dòng Header của Đầu công việc */}
+                            <tr className="bg-slate-200/60 border-y border-slate-300">
+                              <td colSpan="5" className="px-6 py-3 font-bold text-slate-800 whitespace-normal">
+                                <div className="flex items-start">
+                                   <div className="w-2 h-4 bg-indigo-600 rounded-full mr-2.5 mt-0.5 shrink-0"></div>
+                                   <span className="uppercase">{groupName}</span>
+                                </div>
+                              </td>
+                            </tr>
+                            
+                            {Object.entries(activities).map(([activityName, indicators], actIdx) => (
+                              <Fragment key={`act-${groupIdx}-${actIdx}`}>
+                                {/* Dòng Header của Hoạt động */}
+                                <tr className="bg-slate-50/80 border-b border-slate-100">
+                                  <td colSpan="5" className="px-6 py-2 font-semibold text-slate-700 whitespace-normal pl-12 relative">
+                                    <div className="absolute left-6 top-0 bottom-0 w-px bg-slate-300"></div>
+                                    <div className="absolute left-6 top-1/2 w-4 h-px bg-slate-300"></div>
+                                    <span className="text-indigo-800">{activityName}</span>
+                                  </td>
+                                </tr>
+
+                                {/* Dòng Sản phẩm/Chỉ số */}
+                                {indicators.map((row) => (
+                                  <tr key={row.id} className="hover:bg-slate-50 transition-colors group">
+                                    <td className="px-6 py-3 text-slate-600 pl-20 relative whitespace-normal min-w-[250px]">
+                                      <div className="absolute left-6 top-0 bottom-0 w-px bg-slate-300"></div>
+                                      <div className="absolute left-14 top-0 bottom-0 w-px bg-slate-200"></div>
+                                      <div className="absolute left-14 top-1/2 w-4 h-px bg-slate-200"></div>
+                                      <span className="font-medium text-slate-500 mr-2">Sản phẩm/Chỉ số:</span>
+                                      <span className="font-bold text-slate-700">{row.name}</span>
+                                    </td>
+                                    <td className="px-6 py-3 text-right font-medium">{row.target.toLocaleString()}</td>
+                                    <td className="px-6 py-3 text-right font-bold text-indigo-600">{row.actual.toLocaleString()}</td>
+                                    <td className="px-6 py-3">
+                                      <div className="flex items-center space-x-3">
+                                        <span className="font-bold w-12 text-right">{row.percent}%</span>
+                                        <div className="flex-1 h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                                          <div 
+                                            className={`h-full rounded-full transition-all duration-500 ${row.isMet ? 'bg-emerald-500' : 'bg-blue-500'}`} 
+                                            style={{ width: `${Math.min(row.percent, 100)}%` }}
+                                          ></div>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-3">
+                                      {row.isMet ? (
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
+                                          <Icon name="check-circle" size="14" className="mr-1.5" /> Đạt
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700">
+                                          <Icon name="x-circle" size="14" className="mr-1.5" /> Chưa đạt
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </Fragment>
+                            ))}
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                )}
+
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DashboardApp />);
+    </script>
+</body>
+</html>
