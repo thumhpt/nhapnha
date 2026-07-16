@@ -94,12 +94,12 @@
                 data.table.rows.forEach((row, index) => {
                   if (!row.c) return;
 
-                  // 1. Quét tìm dòng chứa chữ MỤC TIÊU ở bất kỳ cột nào (từ cột A đến cột F)
+                  // 1. Quét tìm dòng chứa chữ MỤC TIÊU (Quét toàn bộ cột ngang)
                   let isObjectiveRow = false;
-                  for (let i = 0; i <= 5; i++) {
+                  for (let i = 0; i < row.c.length; i++) {
                     if (row.c[i] && typeof row.c[i].v === 'string') {
                       const val = row.c[i].v.toUpperCase().trim();
-                      if (val.startsWith("MỤC TIÊU")) {
+                      if (val.includes("MỤC TIÊU")) {
                         currentObjective = row.c[i].v.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
                         currentTaskGroup = "Công việc chung"; 
                         isObjectiveRow = true;
@@ -109,41 +109,106 @@
                   }
                   if (isObjectiveRow) return;
 
-                  // 2. Bỏ qua HOÀN TOÀN các dòng tiêu đề rác của bảng Excel
+                  // 2. Chặn dòng tiêu đề (RẤT CHẶT CHẼ để không chặn nhầm dữ liệu thật)
                   const isHeaderRow = row.c.some(cell => cell && typeof cell.v === 'string' && 
-                    (cell.v.toUpperCase().includes("HOẠT ĐỘNG") || 
-                     cell.v.toUpperCase().includes("TÊN SẢN PHẨM") || 
-                     cell.v.toUpperCase().includes("SỐ LƯỢNG") ||
-                     cell.v.toUpperCase().includes("TIẾN ĐỘ") ||
-                     cell.v.toUpperCase().includes("THỜI GIAN") ||
-                     cell.v.toUpperCase() === "SẢN PHẨM/CHỈ SỐ ĐẦU RA"));
+                    (cell.v.toUpperCase().trim() === "HOẠT ĐỘNG" || 
+                     cell.v.toUpperCase().trim() === "SẢN PHẨM/CHỈ SỐ ĐẦU RA" || 
+                     cell.v.toUpperCase().trim() === "TÊN SẢN PHẨM/CHỈ SỐ 1"));
                   if (isHeaderRow) return;
 
-                  // 3. Lấy tên Đầu công việc / Hoạt động ở Cột E (Index 4)
-                  const activityVal = row.c[4] && row.c[4].v ? String(row.c[4].v).trim() : "";
-                  if (!activityVal) return;
-
-                  const hasInd1 = row.c[7] && row.c[7].v;
-                  const hasInd2 = row.c[10] && row.c[10].v;
-                  const hasInd3 = row.c[13] && row.c[13].v;
-
-                  // Nếu không có chỉ số nào -> Đây là dòng Tiêu đề Nhóm (Đầu công việc)
-                  if (!hasInd1 && !hasInd2 && !hasInd3) {
-                    currentTaskGroup = activityVal;
-                    return;
+                  // 3. Trích xuất Prefix (Số thứ tự) quét cả Cột A và B
+                  let prefix = "";
+                  for(let i=0; i<=2; i++) {
+                      if (row.c[i] && row.c[i].v) {
+                          const val = String(row.c[i].v).trim();
+                          // Bắt chính xác định dạng số có dấu chấm (VD: 1.1a, 1.1a.1, 1.2)
+                          if (/^[0-9]+(\.[0-9a-zA-Z]+)+/.test(val)) {
+                              prefix = val.split(' ')[0]; // Chỉ lấy phần số
+                              break;
+                          }
+                      }
                   }
 
-                  // 4. Trích xuất dữ liệu của từng cụm chỉ số trên cùng 1 hàng ngang
+                  // 4. Siêu quét tìm Tên Hoạt động (Quét từ cột C đến cột H)
+                  let activityVal = "";
+                  for (let i = 2; i <= 7; i++) {
+                    if (row.c[i] && typeof row.c[i].v === 'string') {
+                      const val = String(row.c[i].v).trim();
+                      // Chọn chuỗi dài > 15 ký tự, không chứa tên đơn vị/thời gian
+                      if (val.length > 15 && 
+                          !val.toUpperCase().includes("HOẠT ĐỘNG") && 
+                          !val.includes("Y tế") && 
+                          !val.includes("Thú y") && 
+                          !val.includes("FHI") && 
+                          !val.toLowerCase().startsWith("quý") &&
+                          !val.toLowerCase().startsWith("tháng")) {
+                        activityVal = val;
+                        break;
+                      }
+                    }
+                  }
+                  
+                  // Dự phòng nếu tên hoạt động ngắn
+                  if (!activityVal) {
+                    for (let i = 3; i <= 6; i++) {
+                       if (row.c[i] && typeof row.c[i].v === 'string') {
+                           const val = String(row.c[i].v).trim();
+                           if (val.length > 5 && !val.includes("Y tế") && !val.includes("Thú y") && !val.includes("FHI")) {
+                               activityVal = val;
+                               break;
+                           }
+                       }
+                    }
+                  }
+
+                  if (!activityVal) return;
+                  
+                  const fullTitle = prefix && !activityVal.startsWith(prefix) ? `${prefix} ${activityVal}` : activityVal;
+
+                  const hasInd1 = row.c[6] && row.c[6].v; // Cột G
+                  const hasInd2 = row.c[9] && row.c[9].v; // Cột J
+                  const hasInd3 = row.c[12] && row.c[12].v; // Cột M
+
+                  // Phân loại: Đầu công việc vs Hoạt động không có chỉ số
+                  if (!hasInd1 && !hasInd2 && !hasInd3) {
+                    let isGroup = false;
+                    
+                    if (prefix) {
+                      // Đếm số lượng dấu chấm. 1.1a có 1 dấu -> Group | 1.1a.1 có 2 dấu -> Hoạt động
+                      const dotCount = (prefix.match(/\./g) || []).length;
+                      if (dotCount < 2) isGroup = true; 
+                    } else {
+                      if (activityVal === activityVal.toUpperCase()) isGroup = true;
+                    }
+
+                    if (isGroup) {
+                      currentTaskGroup = fullTitle;
+                      return;
+                    } else {
+                      // Là Hoạt động (VD: 1.1a.1, 1.1a.2) nhưng chưa nhập sản phẩm/chỉ số
+                      fetchedItems.push({
+                        id: `gs-${index}-empty`,
+                        activity: fullTitle,
+                        name: "(Chưa có sản phẩm/chỉ số)",
+                        target: 0,
+                        actual: 0,
+                        objective: currentObjective,
+                        taskGroup: currentTaskGroup || "Công việc chung"
+                      });
+                      return;
+                    }
+                  }
+
+                  // 5. Trích xuất dữ liệu của từng cụm chỉ số trên cùng 1 hàng ngang
                   const extractIndicator = (nameCol, targetCol, actualCol, suffix) => {
                     if (row.c[nameCol] && row.c[nameCol].v) {
                       const indName = String(row.c[nameCol].v).trim();
                       const target = row.c[targetCol] ? Number(row.c[targetCol].v) : 0;
-                      // Lấy giá trị thực tế (Tiến độ), nếu rỗng thì cho bằng 0
                       const actual = row.c[actualCol] ? Number(row.c[actualCol].v) : 0;
 
                       fetchedItems.push({
                         id: `gs-${index}-${suffix}`,
-                        activity: activityVal,
+                        activity: fullTitle,
                         name: indName,
                         target: target,
                         actual: actual,
